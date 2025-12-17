@@ -832,7 +832,6 @@
     </div>
     <div class="modal-body">
       <div class="yt-wrap">
-        <!-- Loop works via playlist param. Autoplay is off (browsers commonly block autoplay with sound). -->
         <iframe
           id="musicFrame"
           src="https://www.youtube.com/embed/x3bBQasjbfs?loop=1&playlist=x3bBQasjbfs&controls=1&modestbranding=1&rel=0"
@@ -883,7 +882,6 @@
           Submit Fix
         </a>
 
-        <!-- language switch (change later) -->
         <button class="pill-link" id="langBtn" type="button">EN</button>
       </div>
     </div>
@@ -973,7 +971,7 @@
   <button id="backToTopMobile" type="button">Top</button>
 
   <script>
-    /* language (UI only; guide content not translated) */
+    /* ===== language ===== */
     const I18N = {
       en: {
         htmlLang: "en",
@@ -1008,7 +1006,15 @@
         loadFail: "Could not load troubleshooting.json.",
         copy: "Copy",
         copied: "Copied",
-        failed: "Failed"
+        failed: "Failed",
+        nav: {
+          gather: "Gather Tab (1)",
+          collect: "Collect Tab (2)",
+          planters: "Planters Tab (3)",
+          status: "Status Tab (4)",
+          tools: "Tools Tab (5)",
+          settings: "Settings Tab (6)"
+        }
       },
       ru: {
         htmlLang: "ru",
@@ -1022,12 +1028,12 @@
         musicBtn: "Музыка",
         openIssues: "Открыть Issues",
         submitFix: "Отправить решение",
-        tabGuide: "Clickpath Guide",
-        tabTrouble: "Troubleshooting",
+        tabGuide: "Гайд по клику (Clickpath)",
+        tabTrouble: "Проблемы и решения",
         quickJump: "Быстрый переход",
         top: "Наверх",
         typingWords: ["Гайд", "Помощь"],
-        tsTitle: "Troubleshooting",
+        tsTitle: "Проблемы и решения",
         tsSub: "Выберите категорию, ищите внутри неё и раскрывайте пункт, чтобы увидеть точное решение. Если нашли новое решение — отправьте его через кнопку в шапке.",
         searchLabel: "Поиск",
         searchPlaceholder: "Искать решения...",
@@ -1043,7 +1049,15 @@
         loadFail: "Не удалось загрузить troubleshooting.json.",
         copy: "Копировать",
         copied: "Скопировано",
-        failed: "Ошибка"
+        failed: "Ошибка",
+        nav: {
+          gather: "Вкладка Gather (1)",
+          collect: "Вкладка Collect (2)",
+          planters: "Вкладка Planters (3)",
+          status: "Вкладка Status (4)",
+          tools: "Вкладка Tools (5)",
+          settings: "Вкладка Settings (6)"
+        }
       }
     };
 
@@ -1129,6 +1143,10 @@
       if (musicModalTitle) musicModalTitle.textContent = t.musicBtn;
       if (musicClose) musicClose.textContent = t.modalClose;
       if (musicFoot) musicFoot.textContent = t.musicFoot;
+
+      // IMPORTANT: render guide + rebuild nav when language changes
+      renderGuide();
+      buildSixItemNav();
     }
 
     function openLanguageGate(){
@@ -1155,6 +1173,7 @@
       localStorage.setItem("site_lang", lang);
       applyLanguage(lang);
       closeLanguageGate();
+      TYPE_WORDS = I18N[CURRENT_LANG].typingWords;
     }
 
     /* keep header height synced */
@@ -1166,7 +1185,7 @@
     }
     window.addEventListener("resize", syncHeaderHeight);
 
-    /* IMPORTANT: smooth scroll disabled on mobile (per request) */
+    /* smooth scroll disabled on mobile (per request) */
     function isMobile(){
       return window.matchMedia("(max-width: 980px)").matches;
     }
@@ -1177,7 +1196,6 @@
       const header = document.getElementById("appHeader");
       const offset = (header ? header.offsetHeight : 0) + 14;
       const y = el.getBoundingClientRect().top + window.pageYOffset - offset;
-
       window.scrollTo({ top: y, behavior: isMobile() ? "auto" : "smooth" });
     }
 
@@ -1277,11 +1295,8 @@
       if (e.key === "Escape" && musicModal.classList.contains("open")) closeMusic();
     });
 
-    /* language button (change later) */
-    const langBtn = document.getElementById("langBtn");
-    if (langBtn){
-      langBtn.addEventListener("click", () => openLanguageGate());
-    }
+    /* language button */
+    document.getElementById("langBtn").addEventListener("click", openLanguageGate);
 
     /* typewriter (slower, caret follows naturally) */
     let TYPE_WORDS = ["Guide", "Troubleshooting Help"];
@@ -1317,8 +1332,9 @@
       tick();
     })();
 
-    /* GUIDE: render as HTML (no external markdown dependency) */
-    const guideHTML = `
+    /* ===== GUIDE CONTENT (EN + RU) =====
+       IMPORTANT: same anchor IDs so sidebar links work in both languages. */
+    const GUIDE_HTML_EN = `
       <h1 id="revolution-macro-guide-and-fixes">Revolution Macro Guide and Fixes</h1>
       <p><strong>Use this for reference!</strong></p>
       <p><strong>Button/Feature format:</strong></p>
@@ -1540,7 +1556,238 @@
       <p>Made by draco, credits to imes, JustZero</p>
     `;
 
-    document.getElementById("guideContent").innerHTML = guideHTML;
+    const GUIDE_HTML_RU = `
+      <h1 id="revolution-macro-guide-and-fixes">Revolution Macro — Гайд и фиксы</h1>
+      <p><strong>Используйте это как справочник.</strong></p>
+      <p><strong>Формат кнопки/функции:</strong></p>
+      <ul>
+        <li><em>Название функции/кнопки</em>: <em>Что делает</em></li>
+      </ul>
+
+      <h2 id="version-08c-pre-release-2">версия 0.8c (Pre-release 2)</h2>
+      <p>Важно: макро должно быть минимум в разрешении 1920x1080 – 1366x768 на Windows, масштаб 100%, без HDR и без сенсорного экрана.</p>
+      <p><strong>Стандартные хоткеи:</strong></p>
+      <ul>
+        <li>START - F1</li>
+        <li>PAUSE - F2</li>
+        <li>STOP - F3</li>
+      </ul>
+
+      <h1 id="tabs-6-in-total">Вкладки — всего 6</h1>
+      <ol>
+        <li>Gather</li>
+        <li>Collect</li>
+        <li>Planters</li>
+        <li>Status</li>
+        <li>Tools</li>
+        <li>Settings</li>
+      </ol>
+
+      <h1 id="gather-tab-1">Вкладка Gather (1)</h1>
+      <h2 id="fields">Fields</h2>
+      <ul>
+        <li>Чтобы изменить поле: нажмите значок ручки (pen). Чтобы вставить готовые настройки: нажмите значок с 6 точками и выберите “Paste”. Готовые настройки ищите в Discord -> #patterns-configs</li>
+        <li>Редактирование поля (рекомендуется копировать/вставлять готовые настройки из Discord Revolution)</li>
+        <li>Отключить drift detection (использует supreme saturator для выравнивания персонажа): нажмите ручку -> “align” под max backpack -> disable</li>
+        <li>Walk or reset to hive: переключатель “череп” и “человек идет” — зависит от настройки поля</li>
+      </ul>
+
+      <h2 id="boosts">Boosts</h2>
+      <ul>
+        <li>Убедитесь, что sprinkler стоит в слоте 1</li>
+        <li>Настройте слоты 2–7 как вам нужно</li>
+      </ul>
+
+      <h2 id="gather-settings">Настройки Gather</h2>
+      <h3>General</h3>
+      <ul>
+        <li>Выберите тип sprinkler, который у вас сейчас в Bee Swarm</li>
+        <li>Если вы blue и макрите в Pine Tree с хорошим FPS — включите “Use Fast Pine Return Path”</li>
+        <li>Disable Gathering: ожидать задания и не фармить honey</li>
+        <li>Use Dipper: удерживать/автокликать мышь</li>
+        <li>Inactive Honey Timeout: максимум секунд, после которых макро прекратит фарм, если honey не прибавляется (по умолчанию 10)</li>
+        <li>Full Bag Timeout: максимум секунд до остановки фарма при полном рюкзаке (capacity)</li>
+      </ul>
+
+      <h3>Drift</h3>
+      <ul>
+        <li>Detect Drift: определяет, когда вы уходите от центра</li>
+        <li>Enable Drift Compensation: включает компенсацию дрифта, если персонаж “уплывает” (также влияет на дрифт камеры)</li>
+        <li>Enable Camera Drift Compensation: компенсация дрифта камеры</li>
+      </ul>
+
+      <h3>Pathing</h3>
+      <ul>
+        <li>Pattern: выбор паттерна фарма, по умолчанию cornerxsnake</li>
+        <li>Use Custom Pattern: свой паттерн</li>
+        <li>Use Natro Pattern: паттерн Natro</li>
+        <li>Use Pattern Annotation: рисует паттерн на экране</li>
+        <li>Use Field Drift Compensation: компенсация дрифта относительно поля</li>
+      </ul>
+
+      <h1 id="collect-tab-2">Вкладка Collect (2)</h1>
+      <h2>General</h2>
+      <ul>
+        <li>Convert At: когда конвертить honey в улье, по умолчанию 95%</li>
+        <li>Convert: включить/выключить конвертацию</li>
+        <li>Convert On Full: конвертить при полном рюкзаке независимо от Convert At</li>
+        <li>Convert With 0 Honey: конвертить при 0 honey (не рекомендуется)</li>
+        <li>Convert With 0 Honey Timeout: максимум секунд до конверта при 0 honey</li>
+        <li>Reset After Convert: reset после конвертации</li>
+      </ul>
+
+      <h2>Conversion</h2>
+      <ul>
+        <li>Use Converter: использовать конвертер в улье</li>
+        <li>Use Micro Converter: использовать micro converter</li>
+        <li>Use Balloon: использовать balloon</li>
+      </ul>
+
+      <h2>Snowflakes</h2>
+      <ul><li>Gather Snowflakes: собирать snowflakes</li></ul>
+
+      <h2>Puffs</h2>
+      <ul>
+        <li>Enabled: собирать puffs</li>
+        <li>Puff Planter Type: тип planter для puff</li>
+        <li>Puff Planter Field: поле, куда ставить puff planter</li>
+        <li>Puff Planter Interval: как часто проверять puffs</li>
+      </ul>
+
+      <h1 id="planters-tab-3">Вкладка Planters (3)</h1>
+      <h2 id="auto-planters">Auto planters</h2>
+      <h3>Settings</h3>
+      <ul>
+        <li>Enabled: включите для авто-planters, иначе ручной режим</li>
+        <li>Degradation Multiplier: по умолчанию 1.2x (1.0–2.0). Помогает алгоритму менять поля при установке одного и того же planter</li>
+        <li>Build Nectars: популярный вариант — 2 Build и 1 Maintain. Одновременно может быть только 3 активных planter</li>
+        <li>Harvest Automatic: если выключено — можно выбрать свои min/max время роста</li>
+        <li>Harvest Fully Grown: собирать только при 100%</li>
+      </ul>
+
+      <h3>Nectar Goals</h3>
+      <ul>
+        <li>Есть 5 типов Nectar: Invigorating, Satisfying, Motivating, Comforting, Refreshing</li>
+        <li>Можно поставить целевые проценты для каждого nectar</li>
+        <li>Можно перетаскивать вверх/вниз, чтобы менять приоритет</li>
+      </ul>
+
+      <h3>Fields</h3>
+      <ul><li>Можно включать/выключать посадку на каждом поле</li></ul>
+
+      <h1 id="status-tab-4">Вкладка Status (4)</h1>
+      <h2>General</h2>
+      <ul><li>Показывает текущий статус: что делает макро</li></ul>
+      <h2>Stats</h2>
+      <ul><li>Статистика: honey/hour, средний honey/hour и т.д.</li></ul>
+      <h2>Discord</h2>
+      <ul><li>Discord Rich Presence: показывает статус в Discord</li></ul>
+
+      <h1 id="tools-tab-5">Вкладка Tools (5)</h1>
+      <h2>General</h2>
+      <ul>
+        <li>Rejoin: переподключиться к серверу</li>
+        <li>Respawn: respawn персонажа</li>
+        <li>Leave: выйти с сервера</li>
+      </ul>
+
+      <h2>Packs</h2>
+      <ul>
+        <li>Enabled: собирать packs</li>
+        <li>Use Natro Pack List: список packs от Natro</li>
+      </ul>
+
+      <h2>Quests</h2>
+      <ul>
+        <li>Enabled: выполнять quests</li>
+        <li>Use Quest Menu: использовать quest menu</li>
+      </ul>
+
+      <h2>Mobs</h2>
+      <ul>
+        <li>Enabled: убивать mobs</li>
+        <li>Use Mondo Hop: mondo hop</li>
+        <li>Use Vicious Bee Hop: vicious bee hop</li>
+      </ul>
+
+      <h1 id="settings-tab-6">Вкладка Settings (6)</h1>
+      <h2>Macro</h2>
+      <h3>Appearance</h3>
+      <ul>
+        <li>Theme: dark mode</li>
+        <li>Always On Top: включайте только если нужно постоянно видеть окно макро</li>
+      </ul>
+
+      <h3>Hotkeys</h3>
+      <ul><li>Настройте хоткеи Start/Pause/Stop здесь</li></ul>
+
+      <h3>Capture</h3>
+      <ul>
+        <li>Fallback Capture Mode: варианты Window, GPU, Legacy</li>
+        <li>Detection Frame Rate: ниже = меньше CPU, но хуже детект бафов и коррекция движения</li>
+      </ul>
+
+      <h3>Misc</h3>
+      <ul>
+        <li>Log Level: 4 для детального логирования (только для дебага), иначе 0</li>
+        <li>Load Timeout: максимум секунд ожидания загрузки AI models (по умолчанию 30). Если модели не грузятся — попробуйте 60</li>
+      </ul>
+
+      <h2>Game</h2>
+      <h3>Movement</h3>
+      <ul>
+        <li>Player Movespeed: скорость в BSS без speed buffs</li>
+        <li>Camera Sensitivity: выставьте как в игре или нажмите “eye” для авто-детекта</li>
+        <li>Key Delay: по умолчанию 20ms. При низком FPS поставьте 30–50</li>
+        <li>Pattern Retry Count: сколько раз пытаться навигировать перед тем как сдаться</li>
+      </ul>
+
+      <h3>Routing</h3>
+      <ul>
+        <li>Use High Alignment: включайте при низком FPS или проблемах pathing</li>
+        <li>Disable Red Cannon: включайте только если red cannon нельзя использовать</li>
+      </ul>
+
+      <h3>Join</h3>
+      <ul>
+        <li>Preferred Hive Slot: 6–1 (6 ближе к noob shop, 1 ближе к red cannon)</li>
+        <li>Hive Claim Method: по умолчанию Detect, если не работает — Check</li>
+        <li>Private Server Link: вставьте ссылку на приватный сервер</li>
+        <li>Fallback the Public Server: переходить в публичные сервера если есть проблемы с приватным</li>
+      </ul>
+
+      <h2>Networking</h2>
+      <ul>
+        <li>Identity: текущая network identity (в RDP отличается)</li>
+        <li>Relay: нажмите start</li>
+        <li>Auto-Start: включайте, если часто используете alts</li>
+        <li>Auto-Connect: подключаться к relay при запуске</li>
+        <li>Available Relays: “+” добавить relay, иконка entry — зайти, star — удалить</li>
+      </ul>
+
+      <h2>Presets</h2>
+      <ul><li>WIP.</li></ul>
+
+      <h2>Accounts</h2>
+      <ul><li>WIP.</li></ul>
+
+      <h2>Credits</h2>
+      <ul><li>Список людей, которые помогали разработке и донатеры</li></ul>
+
+      <hr />
+      <p>Made by draco, credits to imes, JustZero</p>
+    `;
+
+    function renderGuide(){
+      const el = document.getElementById("guideContent");
+      if (!el) return;
+
+      el.innerHTML = (CURRENT_LANG === "ru") ? GUIDE_HTML_RU : GUIDE_HTML_EN;
+
+      addCopyButtons(el);
+      // Rebuild nav after render (IDs exist now)
+      // (buildSixItemNav() is called from applyLanguage too)
+    }
 
     /* copy buttons on code blocks */
     function addCopyButtons(root){
@@ -1574,46 +1821,47 @@
         pre.appendChild(btn);
       });
     }
-    addCopyButtons(document.getElementById("guideContent"));
 
-    /* build EXACTLY 6 sidebar links */
+    /* build EXACTLY 6 sidebar links (labels localized; IDs same) */
     function buildSixItemNav(){
       const nav = document.getElementById("guideNav");
       const drawerLinks = document.getElementById("drawerLinks");
       if (!nav || !drawerLinks) return;
 
+      const t = I18N[CURRENT_LANG];
+
       const wanted = [
-        { label: "Gather Tab (1)", id: "gather-tab-1" },
-        { label: "Collect Tab (2)", id: "collect-tab-2" },
-        { label: "Planters Tab (3)", id: "planters-tab-3" },
-        { label: "Status Tab (4)", id: "status-tab-4" },
-        { label: "Tools Tab (5)", id: "tools-tab-5" },
-        { label: "Settings Tab (6)", id: "settings-tab-6" },
+        { label: t.nav.gather, id: "gather-tab-1" },
+        { label: t.nav.collect, id: "collect-tab-2" },
+        { label: t.nav.planters, id: "planters-tab-3" },
+        { label: t.nav.status, id: "status-tab-4" },
+        { label: t.nav.tools, id: "tools-tab-5" },
+        { label: t.nav.settings, id: "settings-tab-6" },
       ];
 
       nav.innerHTML = "";
       drawerLinks.innerHTML = "";
 
-      wanted.forEach(t => {
-        const targetEl = document.getElementById(t.id);
+      wanted.forEach(item => {
+        const targetEl = document.getElementById(item.id);
         if (!targetEl) return;
 
         const a = document.createElement("a");
-        a.href = "#" + t.id;
-        a.dataset.target = t.id;
-        a.textContent = t.label;
+        a.href = "#" + item.id;
+        a.dataset.target = item.id;
+        a.textContent = item.label;
 
         a.addEventListener("click", (e) => {
           e.preventDefault();
           scrollToWithOffset(targetEl);
-          history.replaceState(null, "", "#" + t.id);
+          history.replaceState(null, "", "#" + item.id);
         });
 
         const b = a.cloneNode(true);
         b.addEventListener("click", (e) => {
           e.preventDefault();
           scrollToWithOffset(targetEl);
-          history.replaceState(null, "", "#" + t.id);
+          history.replaceState(null, "", "#" + item.id);
           closeDrawer();
         });
 
@@ -1818,7 +2066,6 @@
 
     /* init */
     syncHeaderHeight();
-    buildSixItemNav();
     openTab("guide");
 
     (function initLang(){
@@ -1832,27 +2079,12 @@
 
       TYPE_WORDS = I18N[CURRENT_LANG].typingWords;
 
-      const btn = document.getElementById("langBtn");
-      if (btn){
-        btn.addEventListener("click", () => {
-          openLanguageGate();
-        });
-      }
+      // initial render (applyLanguage also renders)
+      renderGuide();
+      buildSixItemNav();
     })();
 
-    /* language toggle button behaviour */
-    document.getElementById("langBtn").addEventListener("click", () => {
-      openLanguageGate();
-    });
-
-    /* update typewriter words when language changes */
-    const _setLanguageOrig = setLanguage;
-    window.setLanguage = function(lang){
-      _setLanguageOrig(lang);
-      TYPE_WORDS = I18N[CURRENT_LANG].typingWords;
-    };
-
-    /* also allow ESC to close language gate only after selection exists */
+    /* allow ESC to close language gate only if language already chosen */
     window.addEventListener("keydown", (e) => {
       if (e.key === "Escape"){
         const saved = localStorage.getItem("site_lang");
@@ -1875,4 +2107,5 @@
   </script>
 </body>
 </html>
+
 
