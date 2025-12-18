@@ -40,7 +40,7 @@
 
 		<header class="site-header">
 			<div class="container header-grid">
-				<!-- Mobile menu button (hamburger). Hidden on desktop by CSS. -->
+				<!-- Hamburger (ALWAYS present) -->
 				<button
 					class="icon-btn"
 					id="menuBtn"
@@ -89,7 +89,7 @@
 			</div>
 		</header>
 
-		<!-- Mobile drawer + backdrop -->
+		<!-- Drawer + backdrop MUST be outside the header and MUST exist -->
 		<div class="drawer-backdrop" id="drawerBackdrop" hidden></div>
 
 		<aside class="drawer" id="mobileDrawer" aria-hidden="true">
@@ -105,15 +105,17 @@
 				</button>
 			</div>
 
-			<nav class="drawer-nav" aria-label="Mobile">
+			<nav class="drawer-nav" aria-label="Mobile navigation">
 				<a href="#/guide" class="drawer-link">Guide</a>
 				<a href="#/troubleshooting" class="drawer-link">Troubleshooting</a>
 				<a href="#/changelog" class="drawer-link">Changelog</a>
 			</nav>
 
 			<div class="drawer-section">
-				<div class="drawer-label">Chapters</div>
-				<div id="drawerGuideNav" class="drawer-chapters"></div>
+				<div class="drawer-label">Quick Jump</div>
+				<div id="drawerGuideNav" class="drawer-chapters">
+					<!-- Populated by pages.js -->
+				</div>
 			</div>
 		</aside>
 
@@ -139,3 +141,4 @@
 		<script src="assets/js/app.js"></script>
 	</body>
 </html>
+
