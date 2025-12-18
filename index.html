@@ -40,6 +40,18 @@
 
 		<header class="site-header">
 			<div class="container header-grid">
+				<!-- Mobile menu button (hamburger). Hidden on desktop by CSS. -->
+				<button
+					class="icon-btn"
+					id="menuBtn"
+					type="button"
+					aria-label="Open menu"
+					aria-controls="mobileDrawer"
+					aria-expanded="false"
+				>
+					<span class="icon-bars" aria-hidden="true"><span></span></span>
+				</button>
+
 				<a href="#/guide" class="brand" aria-label="Revolution Macro home">
 					<div class="brand-mark">RM</div>
 					<div class="brand-copy">
@@ -76,6 +88,34 @@
 				</div>
 			</div>
 		</header>
+
+		<!-- Mobile drawer + backdrop -->
+		<div class="drawer-backdrop" id="drawerBackdrop" hidden></div>
+
+		<aside class="drawer" id="mobileDrawer" aria-hidden="true">
+			<div class="drawer-head">
+				<div class="drawer-title">Menu</div>
+				<button
+					class="icon-btn"
+					id="drawerCloseBtn"
+					type="button"
+					aria-label="Close menu"
+				>
+					✕
+				</button>
+			</div>
+
+			<nav class="drawer-nav" aria-label="Mobile">
+				<a href="#/guide" class="drawer-link">Guide</a>
+				<a href="#/troubleshooting" class="drawer-link">Troubleshooting</a>
+				<a href="#/changelog" class="drawer-link">Changelog</a>
+			</nav>
+
+			<div class="drawer-section">
+				<div class="drawer-label">Chapters</div>
+				<div id="drawerGuideNav" class="drawer-chapters"></div>
+			</div>
+		</aside>
 
 		<main class="page-root">
 			<div id="app" class="app-shell"></div>
