@@ -20,12 +20,14 @@ const UI_COPY = {
 		tag: 'Troubleshooting',
 		title: 'Find and apply the fix fast.',
 		subtitle:
-			'Filter by platform, search keywords, and open the exact walkthrough.',
+			'Filter by category, search keywords, and open the exact walkthrough.',
 		searchPlaceholder: 'Search fixes...',
 		filters: {
-			all: 'All platforms',
+			all: 'All',
 			windows: 'Windows',
 			mac: 'macOS',
+			macro: 'Macro',
+			pro: 'Pro',
 		},
 		noResults: 'No fixes found yet. Check back soon.',
 	},
@@ -40,11 +42,14 @@ const UI_COPY = {
 const PLATFORM_LABELS = {
 	windows: 'Windows',
 	mac: 'macOS',
-	general: 'All platforms',
+	macro: 'Macro',
+	pro: 'Pro',
+	general: 'All',
 };
 
 class Pages {
 	static async renderGuide(container) {
+		// Single-column guide layout (no sidebar). Chapters can live in your mobile drawer.
 		container.innerHTML = `
 			<div class="page-shell">
 				<section class="page-hero">
@@ -57,11 +62,7 @@ class Pages {
 					</div>
 				</section>
 
-				<section class="guide-grid">
-					<aside class="surface side-panel">
-						<div class="panel-head">${UI_COPY.guide.panelTitle}</div>
-						<nav id="guideNav" class="guide-nav"></nav>
-					</aside>
+				<section class="guide-grid single">
 					<article class="surface guide-article">
 						<div id="guideContent" class="prose"></div>
 					</article>
@@ -78,7 +79,7 @@ class Pages {
 			const sections = await response.json();
 			this.guideSections = sections.sections;
 
-			const tocNav = document.getElementById('guideNav');
+			// Desktop sidebar was removed; still build TOC HTML for optional drawer usage.
 			let tocHtml = '';
 
 			this.guideSections.forEach((section, idx) => {
@@ -103,22 +104,27 @@ class Pages {
 				}
 			});
 
-			tocNav.innerHTML = tocHtml;
+			// If you added a drawer chapters container, populate it.
+			const drawerNav = document.getElementById('drawerGuideNav');
+			if (drawerNav) {
+				drawerNav.innerHTML = tocHtml;
 
-			tocNav.querySelectorAll('.guide-link[data-file]').forEach((link) => {
-				link.addEventListener('click', async (e) => {
-					e.preventDefault();
-					const file = link.getAttribute('data-file');
-					const scrollText = (link.getAttribute('data-scroll') || '').trim();
-					if (file) {
-						await this.loadMarkdownFile(file);
-					}
-					if (scrollText) {
-						this.scrollGuideToHeading(scrollText);
-					}
+				drawerNav.querySelectorAll('.guide-link[data-file]').forEach((link) => {
+					link.addEventListener('click', async (e) => {
+						e.preventDefault();
+						const file = link.getAttribute('data-file');
+						const scrollText = (link.getAttribute('data-scroll') || '').trim();
+						if (file) {
+							await this.loadMarkdownFile(file);
+						}
+						if (scrollText) {
+							this.scrollGuideToHeading(scrollText);
+						}
+					});
 				});
-			});
+			}
 
+			// Load first guide section by default
 			if (this.guideSections.length > 0) {
 				const firstFile = this.guideSections[0].file;
 				await this.loadMarkdownFile(firstFile);
@@ -147,10 +153,13 @@ class Pages {
 			const response = await fetch(filepath);
 			const markdown = await response.text();
 			this.currentGuideFile = filepath;
+
 			const html = window.markdown?.render
 				? window.markdown.render(markdown, { breaks: false })
 				: markdown;
-			document.getElementById('guideContent').innerHTML = html;
+
+			const root = document.getElementById('guideContent');
+			if (root) root.innerHTML = html;
 		} catch (error) {
 			console.error('Error loading markdown:', error);
 		}
@@ -180,6 +189,8 @@ class Pages {
 							<button class="chip active" data-platform="all">${UI_COPY.troubleshooting.filters.all}</button>
 							<button class="chip" data-platform="windows">${UI_COPY.troubleshooting.filters.windows}</button>
 							<button class="chip" data-platform="mac">${UI_COPY.troubleshooting.filters.mac}</button>
+							<button class="chip" data-platform="macro">${UI_COPY.troubleshooting.filters.macro}</button>
+							<button class="chip" data-platform="pro">${UI_COPY.troubleshooting.filters.pro}</button>
 						</div>
 					</div>
 					<div id="troubleList" class="accordion-list"></div>
@@ -193,6 +204,7 @@ class Pages {
 
 	static async loadTroubleshootingData() {
 		try {
+			// Approved issues drive the troubleshooting list
 			const issues = await githubAPI.getTroubleshootingIssues('approved');
 			this.allTroubleshootingIssues = issues || [];
 			this.troubleshootingSearchIndex = this.buildTroubleshootingSearchIndex(
@@ -203,12 +215,15 @@ class Pages {
 				!this.allTroubleshootingIssues ||
 				this.allTroubleshootingIssues.length === 0
 			) {
-				document.getElementById('troubleList').innerHTML = `
-					<div class="empty-state">
-						<div class="empty-icon">📋</div>
-						<p>${UI_COPY.troubleshooting.noResults}</p>
-					</div>
-				`;
+				const list = document.getElementById('troubleList');
+				if (list) {
+					list.innerHTML = `
+						<div class="empty-state">
+							<div class="empty-icon">📋</div>
+							<p>${UI_COPY.troubleshooting.noResults}</p>
+						</div>
+					`;
+				}
 				return;
 			}
 
@@ -249,18 +264,25 @@ class Pages {
 
 	static renderTroubleshootingItems(issues) {
 		const accordion = document.getElementById('troubleList');
+		if (!accordion) return;
+
 		let html = '';
 
 		issues.forEach((issue, index) => {
 			const labelNames = issue.labels?.map((l) => l.name) || [];
+
+			// Determine category from labels
 			let platform = 'general';
 			if (labelNames.includes('windows')) platform = 'windows';
 			else if (labelNames.includes('mac')) platform = 'mac';
+			else if (labelNames.includes('macro')) platform = 'macro';
+			else if (labelNames.includes('pro')) platform = 'pro';
 
 			const body = issue.body || 'No description available';
 			let displayTitle = issue.title;
 			let displayBody = body;
 
+			// If user posted a template title, try to extract "Problem title"
 			if (
 				issue.title.trim() === '[Fix]' ||
 				issue.title.trim().match(/^\[\w+\]$/)
@@ -271,11 +293,13 @@ class Pages {
 
 			displayTitle = displayTitle.replace(/^\s*\[\w+\]\s*/, '').trim();
 
+			// Extract images (HTML or Markdown)
 			const htmlImgMatches =
 				displayBody.match(/<img[^>]+src=[\"']([^\"']+)[\"'][^>]*>/g) || [];
 			const mdImgUrls = Array.from(
 				displayBody.matchAll(/!\[[^\]]*\]\(([^)\s]+)(?:\s+\"[^\"]*\")?\)/g)
 			).map((m) => m[1]);
+
 			let imagesHtml = '';
 			if (htmlImgMatches.length > 0 || mdImgUrls.length > 0) {
 				imagesHtml = '<div class="issue-media">';
@@ -291,6 +315,7 @@ class Pages {
 				imagesHtml += '</div>';
 			}
 
+			// Remove images from body so they don't duplicate
 			displayBody = displayBody.replace(/<img[^>]+>/g, '');
 			displayBody = displayBody.replace(
 				/!\[[^\]]*\]\(([^)\s]+)(?:\s+\"[^\"]*\")?\)/g,
@@ -325,6 +350,8 @@ class Pages {
 		accordion.querySelectorAll('.accordion-card').forEach((item) => {
 			const head = item.querySelector('.accordion-head');
 			const body = item.querySelector('.accordion-body');
+			if (!head || !body) return;
+
 			head.addEventListener('click', () => {
 				const open = item.classList.toggle('open');
 				head.setAttribute('aria-expanded', open ? 'true' : 'false');
@@ -336,13 +363,16 @@ class Pages {
 					body.classList.remove('open');
 				}
 			});
+
 			body.style.maxHeight = '0px';
 		});
 	}
 
 	static setupTroubleshootingListeners() {
 		const searchInput = document.getElementById('troubleSearch');
-		searchInput.addEventListener('input', () => this.filterTroubleshooting());
+		if (searchInput) {
+			searchInput.addEventListener('input', () => this.filterTroubleshooting());
+		}
 
 		document.querySelectorAll('#platformFilters .chip').forEach((btn) => {
 			btn.addEventListener('click', () => {
@@ -482,3 +512,4 @@ class Pages {
 		`;
 	}
 }
+
