@@ -35,4 +35,5 @@ An example of a good Relay address is: 10.222.30.14:1234
 
 Go into the Settings tab and click on Networking. Afterwards, click on the +. It will displays a new GUI which has an Identity text bar and an Address text bar. Add any name to your Relay and put the Relay Address in the Address text bar.
 
-Start your relay and it should work.1
+
+Start your relay and it should work.
