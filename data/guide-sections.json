@@ -70,6 +70,14 @@
 			"titleEn": "Settings Tab",
 			"titleRu": "Вкладка Settings",
 			"file": "data/guides/09-settings-tab.md"
+		},
+		{
+			"id": "RDP-tab",
+			"titleEn": "RDP Tab",
+			"titleRu": "RDP Settings",
+			"file": "data/guides/10-rdp-tab.md"
 		}
+	
+	
 	]
 }
