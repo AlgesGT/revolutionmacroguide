@@ -1,208 +1,278 @@
-/**
- * Pages
- * Renders Guide (from data/guide-sections.json + md files),
- * Troubleshooting (from GitHub Issues), and Changelog (from releases).
+/* assets/js/pages.js
+ * Renders Guide / Troubleshooting / Changelog
+ * - Guide loads markdown sections from data/guide-sections.json
+ * - Drawer Quick Jump works from ANY route (auto navigates to #/guide then scrolls)
+ * - Troubleshooting loads approved issues from GitHub API (with category filtering)
  */
 
 class Pages {
-	// -----------------------------
-	// Utilities
-	// -----------------------------
+	static pendingScrollIdKey = "__revo_pending_scroll_id";
 
-	static escapeHtml(s) {
-		return String(s ?? '')
-			.replace(/&/g, '&amp;')
-			.replace(/</g, '&lt;')
-			.replace(/>/g, '&gt;')
-			.replace(/"/g, '&quot;')
-			.replace(/'/g, '&#39;');
+	// ---------- Utilities ----------
+	static setPendingScrollId(id) {
+		try {
+			sessionStorage.setItem(Pages.pendingScrollIdKey, id);
+		} catch {}
 	}
 
-	static setRouteTitle(title) {
-		document.title = title ? `${title} · Revolution Macro Guide` : 'Revolution Macro Guide';
+	static consumePendingScrollId() {
+		try {
+			const id = sessionStorage.getItem(Pages.pendingScrollIdKey);
+			if (id) sessionStorage.removeItem(Pages.pendingScrollIdKey);
+			return id || null;
+		} catch {
+			return null;
+		}
+	}
+
+	static headerOffsetPx() {
+		const header = document.querySelector(".site-header");
+		const h = header ? header.getBoundingClientRect().height : 84;
+		return Math.round(h + 14);
 	}
 
 	static scrollToId(id) {
 		const el = document.getElementById(id);
-		if (!el) return;
-		el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+		if (!el) return false;
+
+		// Use scrollIntoView then correct with offset (more reliable than only CSS in some cases)
+		el.scrollIntoView({ behavior: "smooth", block: "start" });
+		window.setTimeout(() => {
+			window.scrollBy({ top: -Pages.headerOffsetPx(), left: 0, behavior: "smooth" });
+		}, 60);
+
+		return true;
 	}
 
-	static closeDrawerIfOpen() {
-		if (typeof window.__revo_closeDrawer === 'function') {
-			window.__revo_closeDrawer();
+	static async goToGuideAndScroll(id) {
+		// If already on guide, just scroll
+		const hash = window.location.hash || "#/guide";
+		if (hash.startsWith("#/guide") || hash === "#/" || hash === "#") {
+			Pages.scrollToId(id);
+			return;
 		}
+
+		// Otherwise: set pending id, navigate to guide
+		Pages.setPendingScrollId(id);
+		window.location.hash = "#/guide";
 	}
 
-	// -----------------------------
-	// GUIDE
-	// -----------------------------
-
-	static async loadGuideSections() {
-		const res = await fetch('data/guide-sections.json', { cache: 'no-store' });
-		if (!res.ok) throw new Error(`Failed to load guide-sections.json (${res.status})`);
-		const json = await res.json();
-		return Array.isArray(json?.sections) ? json.sections : [];
+	static escapeHtml(text) {
+		return String(text)
+			.replace(/&/g, "&amp;")
+			.replace(/</g, "&lt;")
+			.replace(/>/g, "&gt;")
+			.replace(/"/g, "&quot;")
+			.replace(/'/g, "&#39;");
 	}
 
-	static buildQuickJumpButtons(sections) {
-		// User requirement: exactly 6 quick-jump buttons relying on IDs.
-		// We will point to the six tab sections by their IDs in guide-sections.json:
-		// gather-tab, collect-tab, planters-tab, status-tab, tools-tab, settings-tab
-		const wanted = [
-			{ id: 'gather-tab', label: 'Gather Tab (1)' },
-			{ id: 'collect-tab', label: 'Collect Tab (2)' },
-			{ id: 'planters-tab', label: 'Planters Tab (3)' },
-			{ id: 'status-tab', label: 'Status Tab (4)' },
-			{ id: 'tools-tab', label: 'Tools Tab (5)' },
-			{ id: 'settings-tab', label: 'Settings Tab (6)' },
-		];
-
-		// Only include those that exist in JSON
-		const existingIds = new Set(sections.map((s) => s.id));
-		const finalButtons = wanted.filter((b) => existingIds.has(b.id));
-
-		return `
-			<div class="drawer-section">
-				<div class="drawer-label">Quick Jump</div>
-				<div class="drawer-nav">
-					${finalButtons
-						.map(
-							(b) => `
-						<button type="button" class="guide-link" data-jump="${Pages.escapeHtml(
-							b.id
-						)}">
-							<span class="guide-index">→</span>
-							<span class="guide-title">${Pages.escapeHtml(b.label)}</span>
-						</button>
-					`
-						)
-						.join('')}
-					<button type="button" class="guide-link" data-jump="top">
-						<span class="guide-index">↑</span>
-						<span class="guide-title">Top</span>
-					</button>
-				</div>
-			</div>
-		`;
+	static async fetchText(path) {
+		const res = await fetch(path, { cache: "no-store" });
+		if (!res.ok) throw new Error(`Failed to fetch: ${path} (${res.status})`);
+		return await res.text();
 	}
 
+	static async fetchJson(path) {
+		const res = await fetch(path, { cache: "no-store" });
+		if (!res.ok) throw new Error(`Failed to fetch JSON: ${path} (${res.status})`);
+		return await res.json();
+	}
+
+	// ---------- Guide ----------
 	static async renderGuide(container) {
-		Pages.setRouteTitle('Guide');
-
-		const sections = await Pages.loadGuideSections();
-
-		// Render page shell immediately
 		container.innerHTML = `
-			<div class="page-shell">
-				<section class="page-hero">
-					<div class="eyebrow">Macro Guide</div>
-					<h1>Revolution Macro Guide</h1>
-					<p class="lead">Browse the guide sections below. Use the menu (top-left) for Quick Jump.</p>
-				</section>
+			<section class="container page-shell page-enter">
+				<div class="page-hero">
+					<div class="eyebrow">GUIDE</div>
+					<h1>Revolution Macro, clearly explained.</h1>
+					<p class="lead">Install, configure, and optimize the macro without guesswork.</p>
+				</div>
 
-				<section class="surface guide-grid single">
-					<article class="guide-article prose" id="guideContent">
+				<div class="surface guide-grid single">
+					<div class="prose" id="guideRoot">
 						<div class="loading"><div class="spinner"></div></div>
-					</article>
-				</section>
+					</div>
+				</div>
+			</section>
+		`;
+
+		// Load sections list
+		const guideRoot = document.getElementById("guideRoot");
+		let sectionsJson;
+		try {
+			sectionsJson = await Pages.fetchJson("data/guide-sections.json");
+		} catch (e) {
+			console.error(e);
+			guideRoot.innerHTML = `
+				<div class="empty-state">
+					<div class="empty-icon">⚠️</div>
+					<div>Could not load <code>data/guide-sections.json</code>.</div>
+				</div>
+			`;
+			return;
+		}
+
+		const sections = Array.isArray(sectionsJson?.sections) ? sectionsJson.sections : [];
+
+		// Render markdown in-order into ONE guide page (your “full guide”)
+		let html = "";
+		for (const s of sections) {
+			try {
+				const md = await Pages.fetchText(s.file);
+				// markdown.render() provided by assets/js/markdown.js
+				const rendered = window.markdown?.render
+					? window.markdown.render(md)
+					: `<pre>${Pages.escapeHtml(md)}</pre>`;
+
+				// Wrap each section with a stable id for quick jump
+				// We are NOT changing your internal markdown wording; this is a container wrapper only.
+				html += `
+					<section class="guide-section" id="${Pages.escapeHtml(s.id)}">
+						${rendered}
+					</section>
+				`;
+			} catch (e) {
+				console.error(e);
+				html += `
+					<section class="guide-section" id="${Pages.escapeHtml(s.id)}">
+						<div class="empty-state">
+							<div class="empty-icon">⚠️</div>
+							<div>Could not load <code>${Pages.escapeHtml(s.file)}</code>.</div>
+						</div>
+					</section>
+				`;
+			}
+		}
+
+		guideRoot.innerHTML = html || `
+			<div class="empty-state">
+				<div class="empty-icon">📄</div>
+				<div>No guide sections found.</div>
 			</div>
 		`;
 
-		// Populate drawer quick jump
-		const drawerNav = document.getElementById('drawerGuideNav');
-		if (drawerNav) {
-			drawerNav.innerHTML = Pages.buildQuickJumpButtons(sections);
+		// Build Quick Jump items in drawer
+		Pages.renderDrawerGuideNav(sections);
 
-			// Event delegation for quick jump buttons
-			drawerNav.onclick = (e) => {
-				const btn = e.target.closest('button[data-jump]');
-				if (!btn) return;
-
-				const target = btn.getAttribute('data-jump');
-				Pages.closeDrawerIfOpen();
-
-				if (target === 'top') {
-					window.scrollTo({ top: 0, behavior: 'smooth' });
-					return;
-				}
-
-				// Jump to wrapper section id (we create those below)
-				Pages.scrollToId(target);
-			};
+		// If we came here from another tab using quick jump, consume and scroll
+		const pending = Pages.consumePendingScrollId();
+		if (pending) {
+			// slight delay to ensure DOM is ready
+			window.setTimeout(() => {
+				Pages.scrollToId(pending);
+			}, 120);
 		}
-
-		// Fetch all markdown files in order and build ONE guide HTML
-		const guideEl = document.getElementById('guideContent');
-		if (!guideEl) return;
-
-		const pieces = [];
-
-		for (const section of sections) {
-			if (!section?.file || !section?.id) continue;
-
-			const r = await fetch(section.file, { cache: 'no-store' });
-			if (!r.ok) {
-				pieces.push(
-					`<section id="${Pages.escapeHtml(section.id)}">
-						<h2>${Pages.escapeHtml(section.titleEn || section.id)}</h2>
-						<p><em>Failed to load:</em> ${Pages.escapeHtml(section.file)}</p>
-					</section>`
-				);
-				continue;
-			}
-
-			const md = await r.text();
-			const html = window.markdown?.render ? window.markdown.render(md) : `<pre>${Pages.escapeHtml(md)}</pre>`;
-
-			// IMPORTANT: We do NOT rewrite guide wording.
-			// We only wrap each section with an ID so quick-jump can scroll reliably.
-			pieces.push(`<section id="${Pages.escapeHtml(section.id)}">${html}</section>`);
-		}
-
-		guideEl.innerHTML = pieces.join('\n\n');
 	}
 
-	// -----------------------------
-	// TROUBLESHOOTING (GitHub Issues)
-	// -----------------------------
+	static renderDrawerGuideNav(sections) {
+		const host = document.getElementById("drawerGuideNav");
+		if (!host) return;
 
-	static issueCategoryFromLabels(labels = []) {
-		const names = labels.map((l) => String(l?.name || '').toLowerCase());
-		if (names.includes('windows')) return 'windows';
-		if (names.includes('mac') || names.includes('macos')) return 'macos';
-		if (names.includes('macro')) return 'macro';
-		if (names.includes('pro')) return 'pro';
-		return 'other';
+		// Keep exactly 6 quick-jump buttons if you want (example uses the first 6 guide sections)
+		// If you prefer specific 6, you can change which IDs are used here.
+		const quick = sections.slice(0, 6);
+
+		host.innerHTML = quick
+			.map((s, idx) => {
+				const title = s.titleEn || s.id;
+				return `
+					<button class="guide-link" type="button" data-jump-id="${Pages.escapeHtml(s.id)}">
+						<span class="guide-index">${idx + 1}</span>
+						<span class="guide-text">${Pages.escapeHtml(title)}</span>
+					</button>
+				`;
+			})
+			.join("");
+
+		// Add "Top" button at bottom of the drawer quick jump
+		host.insertAdjacentHTML(
+			"beforeend",
+			`
+			<button class="guide-link" type="button" data-jump-top="1">
+				<span class="guide-index">↑</span>
+				<span class="guide-text">Top</span>
+			</button>
+		`
+		);
+
+		// Bind click behavior
+		host.querySelectorAll("[data-jump-id]").forEach((btn) => {
+			btn.addEventListener("click", async () => {
+				const id = btn.getAttribute("data-jump-id");
+				if (!id) return;
+				// close drawer
+				document.dispatchEvent(new CustomEvent("revo:drawer-close"));
+				await Pages.goToGuideAndScroll(id);
+			});
+		});
+
+		host.querySelectorAll("[data-jump-top]").forEach((btn) => {
+			btn.addEventListener("click", () => {
+				document.dispatchEvent(new CustomEvent("revo:drawer-close"));
+				window.scrollTo({ top: 0, behavior: "smooth" });
+			});
+		});
 	}
 
-	static issueCategoryLabel(cat) {
-		if (cat === 'windows') return 'Windows';
-		if (cat === 'macos') return 'macOS';
-		if (cat === 'macro') return 'Macro';
-		if (cat === 'pro') return 'Pro';
-		return 'Other';
-	}
-
+	// ---------- Troubleshooting ----------
 	static async renderTroubleshooting(container) {
-		Pages.setRouteTitle('Troubleshooting');
+		// Submit Fix: website repo
+		const submitFixUrl =
+			"https://github.com/RevolutionGuides/revolutionmacroguide/issues/new" +
+			"?title=" +
+			encodeURIComponent("Fix request: [short title]") +
+			"&labels=" +
+			encodeURIComponent("needs-review,troubleshooting") +
+			"&body=" +
+			encodeURIComponent(
+				[
+					"## What’s the problem?",
+					"",
+					"(Describe what went wrong. Include exact error text if possible.)",
+					"",
+					"## Category",
+					"",
+					"- [ ] windows",
+					"- [ ] macos",
+					"- [ ] macro",
+					"- [ ] pro",
+					"",
+					"## Steps to reproduce",
+					"",
+					"1.",
+					"2.",
+					"3.",
+					"",
+					"## What fixed it?",
+					"",
+					"(Explain the fix clearly. If you have screenshots, paste links.)",
+				].join("\n")
+			);
+
+		const openIssuesUrl =
+			"https://github.com/RevolutionGuides/revolutionmacroguide/issues?q=is%3Aissue+is%3Aopen+label%3Atroubleshooting";
 
 		container.innerHTML = `
-			<div class="page-shell">
-				<section class="page-hero">
-					<div class="eyebrow">Troubleshooting</div>
+			<section class="container page-shell page-enter">
+				<div class="page-hero">
+					<div class="eyebrow">TROUBLESHOOTING</div>
 					<h1>Find and apply the fix fast.</h1>
 					<p class="lead">Filter by category, search keywords, and open the exact walkthrough.</p>
-				</section>
 
-				<section class="surface">
+					<div class="hero-actions" style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap;">
+						<a class="btn btn-ghost" href="${openIssuesUrl}" target="_blank" rel="noopener noreferrer">Open Issues</a>
+						<a class="btn btn-primary" href="${submitFixUrl}" target="_blank" rel="noopener noreferrer">Submit Fix</a>
+					</div>
+				</div>
+
+				<div class="surface">
 					<div class="toolbar">
 						<div class="search">
-							<span class="search-icon">🔍</span>
-							<input id="fixSearch" type="search" placeholder="Search fixes..." autocomplete="off" />
+							<span class="search-icon">🔎</span>
+							<input id="fixSearch" type="text" placeholder="Search fixes..." autocomplete="off" />
 						</div>
 
-						<div class="filter-chips" id="fixChips">
+						<div class="filter-chips" id="fixFilters">
 							<button class="chip active" data-cat="all" type="button">All</button>
 							<button class="chip" data-cat="windows" type="button">Windows</button>
 							<button class="chip" data-cat="macos" type="button">macOS</button>
@@ -214,277 +284,219 @@ class Pages {
 					<div id="fixList" class="accordion-list">
 						<div class="loading"><div class="spinner"></div></div>
 					</div>
-				</section>
-			</div>
+				</div>
+			</section>
 		`;
 
-		// Pull approved issues
-		const issues = await githubAPI.getTroubleshootingIssues('approved');
-		const listEl = document.getElementById('fixList');
-		if (!listEl) return;
+		const list = document.getElementById("fixList");
+		const input = document.getElementById("fixSearch");
+		const filters = document.getElementById("fixFilters");
 
-		if (!Array.isArray(issues) || issues.length === 0) {
-			listEl.innerHTML = `
-				<div class="empty-state">
-					<div class="empty-icon">🛠️</div>
-					<h2>No fixes found</h2>
-					<p>There are no approved troubleshooting issues available right now.</p>
-				</div>
-			`;
-			return;
-		}
+		let activeCat = "all";
+		let query = "";
 
-		// Normalize + filter out PRs (GitHub returns PRs in issues API)
+		// Pull issues labeled "approved" from your site repo (already in your api.js)
+		const issues = (await githubAPI.getTroubleshootingIssues("approved")) || [];
 		const normalized = issues
-			.filter((i) => !i?.pull_request)
+			.filter((i) => !i.pull_request) // skip PRs
 			.map((i) => {
-				const cat = Pages.issueCategoryFromLabels(i.labels || []);
+				const title = i.title || "";
+				const body = i.body || "";
+				const labels = (i.labels || []).map((l) => String(l.name || "").toLowerCase());
+
+				// Determine category based on labels
+				// Expected labels: windows, macos (or mac), macro, pro
+				let cat = "macro";
+				if (labels.includes("windows")) cat = "windows";
+				else if (labels.includes("macos") || labels.includes("mac")) cat = "macos";
+				else if (labels.includes("pro")) cat = "pro";
+				else if (labels.includes("macro")) cat = "macro";
+
 				return {
 					id: i.id,
 					number: i.number,
-					title: i.title || '(Untitled)',
-					body: i.body || '',
-					html_url: i.html_url || '',
-					labels: i.labels || [],
+					title,
+					body,
+					html_url: i.html_url,
+					labels,
 					category: cat,
-					updated_at: i.updated_at,
 				};
 			});
 
-		// Render function
-		const renderList = (activeCat, query) => {
-			const q = String(query || '').trim().toLowerCase();
+		function matches(item) {
+			const inCat = activeCat === "all" ? true : item.category === activeCat;
+			if (!inCat) return false;
 
-			const filtered = normalized.filter((item) => {
-				const catOk = activeCat === 'all' ? true : item.category === activeCat;
-				if (!catOk) return false;
+			if (!query) return true;
+			const q = query.toLowerCase();
+			return (
+				item.title.toLowerCase().includes(q) ||
+				item.body.toLowerCase().includes(q) ||
+				item.labels.some((l) => l.includes(q))
+			);
+		}
 
-				if (!q) return true;
+		function pillForCat(cat) {
+			if (cat === "windows") return "Windows";
+			if (cat === "macos") return "macOS";
+			if (cat === "pro") return "Pro";
+			return "Macro";
+		}
 
-				return (
-					item.title.toLowerCase().includes(q) ||
-					item.body.toLowerCase().includes(q) ||
-					Pages.issueCategoryLabel(item.category).toLowerCase().includes(q)
-				);
-			});
+		function renderItems() {
+			const items = normalized.filter(matches);
 
-			if (filtered.length === 0) {
-				listEl.innerHTML = `
+			if (!items.length) {
+				list.innerHTML = `
 					<div class="empty-state">
-						<div class="empty-icon">🔎</div>
-						<h2>No matches</h2>
-						<p>Try a different category or search term.</p>
+						<div class="empty-icon">🧩</div>
+						<div>No fixes match your filters.</div>
 					</div>
 				`;
 				return;
 			}
 
-			listEl.innerHTML = filtered
+			list.innerHTML = items
 				.map((item) => {
-					const pill = Pages.issueCategoryLabel(item.category);
-					const bodyHtml = window.markdown?.render
-						? window.markdown.render(item.body, { breaks: true })
+					// Body is markdown; render and sanitize
+					const rendered = window.markdown?.render
+						? window.markdown.render(item.body)
 						: `<pre>${Pages.escapeHtml(item.body)}</pre>`;
 
 					return `
-						<div class="accordion-card" data-acc="${Pages.escapeHtml(item.number)}">
-							<button class="accordion-head" type="button">
+						<div class="accordion-card" data-acc="card">
+							<button class="accordion-head" type="button" data-acc="toggle" aria-expanded="false">
 								<div class="accordion-meta">
-									<span class="pill">${Pages.escapeHtml(pill)}</span>
+									<span class="pill">${pillForCat(item.category)}</span>
 									<span class="accordion-title">${Pages.escapeHtml(item.title)}</span>
 								</div>
 								<span class="chevron">▼</span>
 							</button>
 
-							<div class="accordion-body">
+							<div class="accordion-body" data-acc="body">
 								<div class="prose">
-									${bodyHtml}
-									<p style="margin-top:10px;opacity:.85;">
-										<a href="${Pages.escapeHtml(item.html_url)}" target="_blank" rel="noopener noreferrer">
-											View on GitHub (#${Pages.escapeHtml(item.number)})
+									${rendered}
+									<div style="margin-top:12px;">
+										<a class="btn btn-ghost" href="${item.html_url}" target="_blank" rel="noopener noreferrer">
+											Open on GitHub (#${item.number})
 										</a>
-									</p>
+									</div>
 								</div>
 							</div>
 						</div>
 					`;
 				})
-				.join('');
+				.join("");
 
-			// Make accordion clickable (event delegation)
-			listEl.onclick = (e) => {
-				const head = e.target.closest('.accordion-head');
-				if (!head) return;
+			// Accordion behavior (clickable!)
+			list.querySelectorAll('[data-acc="toggle"]').forEach((btn) => {
+				btn.addEventListener("click", () => {
+					const card = btn.closest('[data-acc="card"]');
+					const body = card?.querySelector('[data-acc="body"]');
+					if (!card || !body) return;
 
-				const card = head.closest('.accordion-card');
-				if (!card) return;
+					const isOpen = card.classList.toggle("open");
+					btn.setAttribute("aria-expanded", String(isOpen));
 
-				const body = card.querySelector('.accordion-body');
-				if (!body) return;
-
-				const isOpen = card.classList.contains('open');
-
-				// close all
-				listEl.querySelectorAll('.accordion-card.open').forEach((c) => {
-					if (c === card) return;
-					c.classList.remove('open');
-					const b = c.querySelector('.accordion-body');
-					if (b) b.style.maxHeight = '0px';
+					// Animate max-height
+					if (isOpen) {
+						body.style.maxHeight = body.scrollHeight + 28 + "px";
+					} else {
+						body.style.maxHeight = "0px";
+					}
 				});
-
-				// toggle current
-				if (isOpen) {
-					card.classList.remove('open');
-					body.style.maxHeight = '0px';
-				} else {
-					card.classList.add('open');
-					body.style.maxHeight = body.scrollHeight + 'px';
-				}
-			};
-
-			// Ensure maxHeight is correct if images load after open
-			listEl.querySelectorAll('img').forEach((img) => {
-				img.addEventListener('load', () => {
-					const openCard = img.closest('.accordion-card.open');
-					if (!openCard) return;
-					const openBody = openCard.querySelector('.accordion-body');
-					if (openBody) openBody.style.maxHeight = openBody.scrollHeight + 'px';
-				});
-			});
-		};
-
-		// Chip + Search wiring
-		let activeCat = 'all';
-		let query = '';
-
-		const chipsEl = document.getElementById('fixChips');
-		const searchEl = document.getElementById('fixSearch');
-
-		if (chipsEl) {
-			chipsEl.onclick = (e) => {
-				const btn = e.target.closest('button[data-cat]');
-				if (!btn) return;
-
-				chipsEl.querySelectorAll('.chip').forEach((c) => c.classList.remove('active'));
-				btn.classList.add('active');
-
-				activeCat = btn.getAttribute('data-cat') || 'all';
-				renderList(activeCat, query);
-			};
-		}
-
-		if (searchEl) {
-			searchEl.addEventListener('input', () => {
-				query = searchEl.value || '';
-				renderList(activeCat, query);
 			});
 		}
 
-		// Initial render
-		renderList(activeCat, query);
+		// Filters
+		filters.querySelectorAll(".chip").forEach((btn) => {
+			btn.addEventListener("click", () => {
+				filters.querySelectorAll(".chip").forEach((b) => b.classList.remove("active"));
+				btn.classList.add("active");
+				activeCat = btn.getAttribute("data-cat") || "all";
+				renderItems();
+			});
+		});
+
+		// Search
+		input.addEventListener("input", () => {
+			query = input.value || "";
+			renderItems();
+		});
+
+		renderItems();
 	}
 
-	// -----------------------------
-	// CHANGELOG (Releases)
-	// -----------------------------
-
+	// ---------- Changelog ----------
 	static async renderChangelog(container) {
-		Pages.setRouteTitle('Changelog');
-
 		container.innerHTML = `
-			<div class="page-shell">
-				<section class="page-hero">
-					<div class="eyebrow">Changelog</div>
-					<h1>Latest releases</h1>
-					<p class="lead">Pulled from the official Revolution Macro releases.</p>
-				</section>
+			<section class="container page-shell page-enter">
+				<div class="page-hero">
+					<div class="eyebrow">CHANGELOG</div>
+					<h1>Latest releases.</h1>
+					<p class="lead">Live fetched from GitHub releases.</p>
+				</div>
 
-				<section class="release-grid" id="releaseGrid">
+				<div class="surface" id="changelogRoot">
 					<div class="loading"><div class="spinner"></div></div>
-				</section>
-			</div>
+				</div>
+			</section>
 		`;
 
-		const releases = await githubAPI.getReleases();
-		const grid = document.getElementById('releaseGrid');
-		if (!grid) return;
+		const root = document.getElementById("changelogRoot");
+		const releases = (await githubAPI.getReleases()) || [];
 
-		if (!Array.isArray(releases) || releases.length === 0) {
-			grid.innerHTML = `
+		if (!releases.length) {
+			root.innerHTML = `
 				<div class="empty-state">
 					<div class="empty-icon">📦</div>
-					<h2>No releases found</h2>
-					<p>Could not load releases from GitHub.</p>
+					<div>No releases found.</div>
 				</div>
 			`;
 			return;
 		}
 
-		grid.innerHTML = releases
+		root.innerHTML = releases
 			.map((r) => {
-				const name = r.name || r.tag_name || 'Release';
-				const date = r.published_at ? githubAPI.formatDate(r.published_at) : '';
-				const body = r.body ? window.markdown.render(r.body, { breaks: true }) : '';
-				const assets = Array.isArray(r.assets) ? r.assets : [];
+				const name = r.name || r.tag_name || "Release";
+				const date = r.published_at ? githubAPI.formatDate(r.published_at) : "";
+				const body = r.body || "";
+				const rendered = window.markdown?.render
+					? window.markdown.render(body)
+					: `<pre>${Pages.escapeHtml(body)}</pre>`;
 
 				return `
-					<article class="surface release-card">
-						<div class="release-header">
-							<div>
-								<div class="pill">${Pages.escapeHtml(date)}</div>
-								<div class="release-title">${Pages.escapeHtml(name)}</div>
+					<div class="accordion-card open" style="margin-bottom:12px;">
+						<div class="accordion-head" style="cursor:default;">
+							<div class="accordion-meta">
+								<span class="pill">Release</span>
+								<span class="accordion-title">${Pages.escapeHtml(name)}</span>
+								<span style="margin-left:10px;opacity:.65;font-weight:800;">${Pages.escapeHtml(date)}</span>
 							</div>
-							<div class="release-tags">
-								<a class="download-chip" href="${Pages.escapeHtml(r.html_url)}" target="_blank" rel="noopener noreferrer">
-									View on GitHub
-								</a>
+							<a class="btn btn-ghost" href="${r.html_url}" target="_blank" rel="noopener noreferrer">GitHub</a>
+						</div>
+						<div class="accordion-body" style="max-height:none;">
+							<div class="prose" style="padding:14px 16px 16px;">
+								${rendered}
 							</div>
 						</div>
-						<div class="release-body prose">${body}</div>
-
-						${
-							assets.length
-								? `<div class="release-downloads">
-									${assets
-										.slice(0, 8)
-										.map((a) => {
-											return `<a class="download-chip" href="${Pages.escapeHtml(
-												a.browser_download_url
-											)}" target="_blank" rel="noopener noreferrer">
-												<span class="download-name">${Pages.escapeHtml(a.name)}</span>
-												<span class="download-size">${Pages.escapeHtml(
-													githubAPI.formatSize(a.size)
-												)}</span>
-											</a>`;
-										})
-										.join('')}
-								</div>`
-								: ''
-						}
-					</article>
+					</div>
 				`;
 			})
-			.join('');
+			.join("");
 	}
 
-	// -----------------------------
-	// 404
-	// -----------------------------
-
 	static render404(container) {
-		Pages.setRouteTitle('Not found');
 		container.innerHTML = `
-			<div class="page-shell">
-				<div class="empty-state">
-					<div class="empty-icon">❓</div>
-					<h2>Page not found</h2>
-					<p>That route does not exist.</p>
+			<section class="container page-shell page-enter">
+				<div class="page-hero">
+					<div class="eyebrow">404</div>
+					<h1>Page not found.</h1>
+					<p class="lead">Use the navigation to get back on track.</p>
 				</div>
-			</div>
+			</section>
 		`;
 	}
 }
 
 window.Pages = Pages;
-
-
