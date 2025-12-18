@@ -261,7 +261,7 @@ class Pages {
 
 					<div class="hero-actions" style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap;">
 						<a class="btn btn-ghost" href="${openIssuesUrl}" target="_blank" rel="noopener noreferrer">Open Issues</a>
-						<a class="btn btn-primary" href="${submitFixUrl}" target="_blank" rel="noopener noreferrer">Submit Fix</a>
+						<a class="btn btn-primary" href="${https://github.com/RevolutionGuides/revolutionmacroguide/issues/new}" target="_blank" rel="noopener noreferrer">Submit Fix</a>
 					</div>
 				</div>
 
